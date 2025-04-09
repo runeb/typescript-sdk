@@ -227,6 +227,55 @@ describe("tool()", () => {
     expect(result.tools[0].description).toBe("Test description");
   });
 
+  test("should register tool with annotations", async () => {
+    const mcpServer = new McpServer({
+      name: "test server",
+      version: "1.0",
+    });
+    const client = new Client({
+      name: "test client",
+      version: "1.0",
+    });
+
+    mcpServer.tool(
+      "test",
+      async () => ({
+        content: [
+          {
+            type: "text",
+            text: "Test response",
+          },
+        ],
+      }),
+      {
+        title: "Destructive tool title",
+        readOnlyHint: false,
+        destructiveHint: true,
+      }
+    )
+
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+
+    await Promise.all([
+      client.connect(clientTransport),
+      mcpServer.server.connect(serverTransport),
+    ]);
+
+    const result = await client.request(
+      {
+        method: "tools/list",
+      },
+      ListToolsResultSchema,
+    );
+
+    expect(result.tools).toHaveLength(1);
+    expect(result.tools[0].name).toBe("test");
+    expect(result.tools[0].annotations?.readOnlyHint).toBe(false);
+    expect(result.tools[0].annotations?.destructiveHint).toBe(true);
+    expect(result.tools[0].annotations?.title).toBe("Destructive tool title");
+  });
+
   test("should validate tool args", async () => {
     const mcpServer = new McpServer({
       name: "test server",

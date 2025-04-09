@@ -730,6 +730,53 @@ export const PromptListChangedNotificationSchema = NotificationSchema.extend({
   method: z.literal("notifications/prompts/list_changed"),
 });
 
+/**
+ * ToolAnnotations
+ * 
+ * Additional properties describing a Tool to clients.
+ */
+export const ToolAnnotationsSchema = z
+  .object({
+    /**
+     * A human-readable title for the tool.
+     */
+    title: z.string().optional(),
+    /**
+     * If true, the tool does not modify its environment.
+     *
+     * Default: false
+     */
+    readOnlyHint: z.boolean().optional(),
+    /**
+     * If true, the tool may perform destructive updates to its environment.
+     * If false, the tool performs only additive updates.
+     *
+     * (This property is meaningful only when `readOnlyHint == false`)
+     *
+     * Default: true
+     */
+    destructiveHint: z.boolean().optional(),
+    /**
+     * If true, calling the tool repeatedly with the same arguments
+     * will have no additional effect on the its environment.
+     *
+     * (This property is meaningful only when `readOnlyHint == false`)
+     *
+     * Default: false
+     */
+    idempotentHint: z.boolean().optional(),
+    /**
+     * If true, this tool may interact with an "open world" of external
+     * entities. If false, the tool's domain of interaction is closed.
+     * For example, the world of a web search tool is open, whereas that
+     * of a memory tool is not.
+     *
+     * Default: true
+     */
+    openWorldHint: z.boolean().optional(),
+  })
+  .passthrough()
+
 /* Tools */
 /**
  * Definition for a tool the client can call.
@@ -753,6 +800,10 @@ export const ToolSchema = z
         properties: z.optional(z.object({}).passthrough()),
       })
       .passthrough(),
+    /**
+     * Additional properties describing a Tool to clients.
+     */
+    annotations: z.optional(ToolAnnotationsSchema),
   })
   .passthrough();
 
@@ -1226,6 +1277,7 @@ export type PromptListChangedNotification = Infer<typeof PromptListChangedNotifi
 
 /* Tools */
 export type Tool = Infer<typeof ToolSchema>;
+export type ToolAnnotations = Infer<typeof ToolAnnotationsSchema>;
 export type ListToolsRequest = Infer<typeof ListToolsRequestSchema>;
 export type ListToolsResult = Infer<typeof ListToolsResultSchema>;
 export type CallToolResult = Infer<typeof CallToolResultSchema>;

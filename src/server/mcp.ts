@@ -14,6 +14,7 @@ import {
 import {
   Implementation,
   Tool,
+  ToolAnnotations,
   ListToolsResult,
   CallToolResult,
   McpError,
@@ -114,6 +115,7 @@ export class McpServer {
                     strictUnions: true,
                   }) as Tool["inputSchema"])
                 : EMPTY_OBJECT_JSON_SCHEMA,
+              annotations: tool.annotations,
             };
           },
         ),
@@ -523,9 +525,19 @@ export class McpServer {
   tool(name: string, cb: ToolCallback): void;
 
   /**
+   * Registers a zero-argument tool `name` (with annotations), which will run the given function when the client calls it.
+   */
+  tool(name: string, cb: ToolCallback, annotations: ToolAnnotations): void;
+
+  /**
    * Registers a zero-argument tool `name` (with a description) which will run the given function when the client calls it.
    */
   tool(name: string, description: string, cb: ToolCallback): void;
+
+  /**
+   * Registers a zero-argument tool `name` (with a description and annotations) which will run the given function when the client calls it.
+   */
+  tool(name: string, description: string, cb: ToolCallback, annotations: ToolAnnotations): void;
 
   /**
    * Registers a tool `name` accepting the given arguments, which must be an object containing named properties associated with Zod schemas. When the client calls it, the function will be run with the parsed and validated arguments.
@@ -534,6 +546,16 @@ export class McpServer {
     name: string,
     paramsSchema: Args,
     cb: ToolCallback<Args>,
+  ): void;
+
+  /**
+   * Registers a tool `name` (with annotations) accepting the given arguments, which must be an object containing named properties associated with Zod schemas. When the client calls it, the function will be run with the parsed and validated arguments.
+   */
+  tool<Args extends ZodRawShape>(
+    name: string,
+    paramsSchema: Args,
+    cb: ToolCallback<Args>,
+    annotations: ToolAnnotations,
   ): void;
 
   /**
@@ -546,27 +568,45 @@ export class McpServer {
     cb: ToolCallback<Args>,
   ): void;
 
+  /**
+   * Registers a tool `name` (with a description and annotations) accepting the given arguments, which must be an object containing named properties associated with Zod schemas. When the client calls it, the function will be run with the parsed and validated arguments.
+   */
+  tool<Args extends ZodRawShape>(
+    name: string,
+    description: string,
+    paramsSchema: Args,
+    cb: ToolCallback<Args>,
+    annotations: ToolAnnotations,
+  ): void;
+
   tool(name: string, ...rest: unknown[]): void {
     if (this._registeredTools[name]) {
       throw new Error(`Tool ${name} is already registered`);
     }
 
     let description: string | undefined;
+    let inputSchema: ZodRawShape | undefined;
+    let annotations: ToolAnnotations | undefined;
+
+    if (typeof rest[rest.length - 1] !== "function") {
+      annotations = rest.pop() as ToolAnnotations;
+    }
+    
     if (typeof rest[0] === "string") {
       description = rest.shift() as string;
     }
 
-    let paramsSchema: ZodRawShape | undefined;
     if (rest.length > 1) {
-      paramsSchema = rest.shift() as ZodRawShape;
+      inputSchema = rest.shift() as ZodRawShape;
     }
 
-    const cb = rest[0] as ToolCallback<ZodRawShape | undefined>;
+    const callback = rest[0] as ToolCallback<ZodRawShape | undefined>;
+
     this._registeredTools[name] = {
       description,
-      inputSchema:
-        paramsSchema === undefined ? undefined : z.object(paramsSchema),
-      callback: cb,
+      inputSchema: inputSchema === undefined ? undefined : z.object(inputSchema),
+      annotations,
+      callback,
     };
 
     this.setToolRequestHandlers();
@@ -703,7 +743,16 @@ export type ToolCallback<Args extends undefined | ZodRawShape = undefined> =
 type RegisteredTool = {
   description?: string;
   inputSchema?: AnyZodObject;
+  annotations?: ToolAnnotations;
   callback: ToolCallback<undefined | ZodRawShape>;
+};
+
+export type ToolConfigObject<Args extends ZodRawShape> = {
+  name: string;
+  description?: string;
+  inputSchema?: Args;
+  annotations?: Tool["annotations"];
+  callback: ToolCallback<Args>;
 };
 
 const EMPTY_OBJECT_JSON_SCHEMA = {
